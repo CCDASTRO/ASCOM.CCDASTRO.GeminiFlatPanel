@@ -2,7 +2,7 @@
 
 ASCOM CoverCalibrator and Switch drivers for the Gemini motorized flat panel. Version **0.11**.
 
-[Download the Windows installer](https://github.com/CCDASTRO/ASCOM.CCDASTRO.GeminiFlatPanel/releases/tag/v0.11) · [Offline HTML guide](docs/GeminiFlatPanel-Guide.html)
+[Download the installer — GitHub release v0.11](https://github.com/CCDASTRO/ASCOM.CCDASTRO.GeminiFlatPanel/releases/tag/v0.11) · [Offline HTML guide](docs/GeminiFlatPanel-Guide.html)
 
 Control the cover, flat-field light, dew heater, brightness mode, and beep from ASCOM clients such as NINA.
 
