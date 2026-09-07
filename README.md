@@ -74,6 +74,16 @@ Allow an active movement or halt confirmation to finish. If the problem persists
 
 Settings are stored per Windows user in `%LOCALAPPDATA%\CCDASTRO\GeminiFlatPanel`. Installation and removal retain these settings and do not send hardware configuration commands. This package includes no machine-specific calibration files.
 
+### Firmware updates
+
+Existing commands may remain compatible after a firmware update, but compatibility is not guaranteed. Even without new features, firmware can change reply formats, status meanings, endpoint readings, or halt timing. The behavior validated for this prototype used firmware V107; other versions require verification.
+
+Before updating, record the working firmware version and calibration settings, retain a copy of the driver settings, and follow the update instructions from the manufacturer. After updating, reconnect and arrange supervised checks of cover status, opening and closing, halt, light brightness, and Switch controls before unattended use. Keep beep enabled if that is your preference; do not toggle it off merely as part of a routine check.
+
+The driver compares firmware identification and controller limits with the verified baseline before opening or closing. A detected mismatch blocks movement, enables the motion lock, and clears locally remembered endpoint positions. Controller-limit fallback for endpoint recognition also requires a matching baseline. These checks cannot detect every possible firmware behavior change and do not replace physical validation.
+
+If movement is blocked after an update, inspect and revalidate calibration and compatibility before re-establishing the verified baseline through supervised setup. Do not simply bypass the lock. A driver update may be needed if controller behavior has changed.
+
 ### Validation of this prototype
 
 Version 0.11 passed 201 simulated assertions and the Switch Conform property, method, and write tests, including fractional values, with no reported errors or issues. CoverCalibrator property and method tests passed on version 0.10; version 0.11 adds Switch rounding and version metadata changes. Performance stress tests were disabled. These results are development validation, not a claim of ASCOM certification.
@@ -95,3 +105,4 @@ dotnet build ASCOM.CCDASTRO.GeminiFlatPanel.sln -c Release
 The installer is written to `dist`. See [installer details](installer/README.md). The local server provides both 32-bit and 64-bit COM registration from one shared process.
 
 The v0.11 installer was successfully installed by the user and NINA displayed v0.11. Uninstall and upgrade paths have not yet been separately validated. The installer is unsigned.
+
