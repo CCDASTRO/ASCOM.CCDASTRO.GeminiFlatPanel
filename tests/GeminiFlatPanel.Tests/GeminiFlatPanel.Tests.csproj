@@ -1,0 +1,3 @@
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net48</TargetFramework><UseWindowsForms>true</UseWindowsForms><LangVersion>latest</LangVersion><PlatformTarget>x86</PlatformTarget></PropertyGroup><ItemGroup><ProjectReference Include="..\..\src\GeminiFlatPanel.Server\GeminiFlatPanel.Server.csproj" /><Reference Include="ASCOM.DeviceInterfaces"><HintPath>$(MSBuildProgramFiles32)\ASCOM\Developer\Components\Platform\ASCOM.DeviceInterfaces.dll</HintPath><Private>false</Private></Reference></ItemGroup></Project>
+
+
