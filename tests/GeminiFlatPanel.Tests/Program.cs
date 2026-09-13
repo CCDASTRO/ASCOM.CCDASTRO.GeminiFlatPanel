@@ -274,6 +274,7 @@ class Program
             Hardware.Release(); channel.PositionStep = 0; Hardware.HaltTimeoutMilliseconds = 3000;
             channel.SuppressHaltReply = false;
             int offIndex = channel.Commands.LastIndexOf(">B0#\n"); Check(offIndex > 0 && channel.Commands[offIndex - 1] == ">D#\n", "light-off preparation missing");
+            ExternalSwitchTests.Run(Check, Throws);
             Console.WriteLine("PASS: " + assertions + " assertions; no physical serial port opened."); return 0;
         }
         catch(Exception ex) { Console.Error.WriteLine(ex); return 1; }
@@ -323,13 +324,3 @@ sealed class FakeChannel : ISerialChannel
         else if(text.StartsWith(">W")) Heater = int.Parse(text.Substring(2).Trim('#','\n'));
     }
 }
-
-
-
-
-
-
-
-
-
-

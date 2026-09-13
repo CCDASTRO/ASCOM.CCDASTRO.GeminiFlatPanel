@@ -12,9 +12,10 @@ namespace GeminiFlatPanel.Server
         private readonly Label status = new Label { AutoSize = true, MaximumSize = new Size(510, 0) };
         private readonly FlowLayoutPanel live = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Enabled = false };
         private bool attached;
+        private readonly Label external = new Label { AutoSize = true, MaximumSize = new Size(510, 0) };
         public SetupForm()
         {
-            Text = "CCDASTRO Gemini FlatPanel Setup"; ClientSize = new Size(560, 490); Font = new Font("Segoe UI", 10); AutoScaleMode = AutoScaleMode.Dpi;
+            Text = "CCDASTRO Gemini FlatPanel Setup"; ClientSize = new Size(600, 680); Font = new Font("Segoe UI", 10); AutoScaleMode = AutoScaleMode.Dpi;
             var root = new FlowLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(16), FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true }; Controls.Add(root);
             ports.Items.AddRange(SerialPort.GetPortNames()); ports.Text = Settings.Load().Port; ports.Enabled = !Hardware.InUse;
             root.Controls.Add(Row(new Label { Text = "COM port", AutoSize = true }, ports, Button("Save port", SavePort)));
@@ -28,6 +29,10 @@ namespace GeminiFlatPanel.Server
             live.Controls.Add(new Label { Text = "After visually verifying a fully reached endpoint, remember its position.\nThis stores a local observation; it does not alter device calibration.", AutoSize = true });
             live.Controls.Add(Row(Button("Remember fully closed", () => Remember(false)), Button("Remember fully open", () => Remember(true))));
             live.Controls.Add(Button("Refresh state", RefreshStatus)); root.Controls.Add(live); root.Controls.Add(status);
+            root.Controls.Add(new Label { Text = "Optional SVBONY ASCOM Switch", AutoSize = true });
+            RefreshExternal(); root.Controls.Add(external);
+            root.Controls.Add(Row(Button("Choose SVBONY driver", ChooseExternal), Button("Disable external", () => { ExternalSwitch.Configure(""); RefreshExternal(); })));
+            root.Controls.Add(new Label { Text = "Disconnect Gemini Switch clients before changing this selection.\nUse the chooser Properties button for SVBONY setup.\nGemini IDs 0-3 stay fixed; external channels start at ID 4.", AutoSize = true });
             root.Controls.Add(Button("Done", Close));
             FormClosed += (s,e) => { if(attached) { Hardware.Release(); attached = false; } };
         }
@@ -37,6 +42,22 @@ namespace GeminiFlatPanel.Server
             var button = new Button { Text = text, AutoSize = true };
             button.Click += (s,e) => { try { UseWaitCursor = true; action(); } catch(Exception ex) { MessageBox.Show(this, ex.Message, "Gemini", MessageBoxButtons.OK, MessageBoxIcon.Error); } finally { UseWaitCursor = false; } };
             return button;
+        }
+        private void RefreshExternal()
+        {
+            string id = Settings.Load().ExternalSwitchProgId;
+            external.Text = string.IsNullOrWhiteSpace(id) ? "Disabled (Gemini controls only)" : id;
+        }
+        private void ChooseExternal()
+        {
+            if(ExternalSwitch.InUse) throw new InvalidOperationException("Disconnect all Gemini Switch clients before choosing the external driver.");
+            using(var chooser = new ASCOM.Utilities.Chooser())
+            {
+                chooser.DeviceType = "Switch";
+                string selected = chooser.Choose(Settings.Load().ExternalSwitchProgId ?? "");
+                if(!string.IsNullOrWhiteSpace(selected)) ExternalSwitch.Configure(selected);
+            }
+            RefreshExternal();
         }
         private void SavePort()
         {
@@ -70,4 +91,3 @@ namespace ASCOM.LocalServer
         }
     }
 }
-

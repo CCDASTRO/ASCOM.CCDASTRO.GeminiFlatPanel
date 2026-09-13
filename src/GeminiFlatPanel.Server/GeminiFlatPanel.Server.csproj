@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
- <PropertyGroup><OutputType>WinExe</OutputType><TargetFramework>net48</TargetFramework><UseWindowsForms>true</UseWindowsForms><LangVersion>latest</LangVersion><PlatformTarget>x86</PlatformTarget><AssemblyName>ASCOM.CCDASTRO.GeminiFlatPanel</AssemblyName><Title>CCDASTRO Gemini FlatPanel</Title><Description>Gemini flat panel and dew control local server</Description><Version>0.11.0</Version><AscomPath>$(MSBuildProgramFiles32)\ASCOM\Developer\Components\Platform</AscomPath></PropertyGroup>
- <ItemGroup>
+ <PropertyGroup><OutputType>WinExe</OutputType><TargetFramework>net48</TargetFramework><UseWindowsForms>true</UseWindowsForms><LangVersion>latest</LangVersion><PlatformTarget>x86</PlatformTarget><AssemblyName>ASCOM.CCDASTRO.GeminiFlatPanel</AssemblyName><Title>CCDASTRO Gemini FlatPanel</Title><Description>Gemini flat panel and dew control local server</Description><Version>0.16.0</Version><AscomPath>$(MSBuildProgramFiles32)\ASCOM\Developer\Components\Platform</AscomPath></PropertyGroup>
+ <ItemGroup><Reference Include="ASCOM.DriverAccess"><HintPath>$(AscomPath)\ASCOM.DriverAccess.dll</HintPath><Private>false</Private></Reference>
  <Reference Include="ASCOM.DeviceInterfaces"><HintPath>$(AscomPath)\ASCOM.DeviceInterfaces.dll</HintPath><Private>false</Private></Reference>
  <Reference Include="ASCOM.Exceptions"><HintPath>$(AscomPath)\ASCOM.Exceptions.dll</HintPath><Private>false</Private></Reference>
  <Reference Include="ASCOM.Utilities"><HintPath>$(AscomPath)\ASCOM.Utilities.dll</HintPath><Private>false</Private></Reference>
@@ -8,12 +8,3 @@
  <ProjectReference Include="..\GeminiFlatPanel.Core\GeminiFlatPanel.Core.csproj" />
  </ItemGroup>
 </Project>
-
-
-
-
-
-
-
-
-

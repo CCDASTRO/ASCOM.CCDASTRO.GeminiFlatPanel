@@ -5,6 +5,8 @@ namespace GeminiFlatPanel.Server
 {
     public class Settings
     {
+        public string ExternalSwitchProgId { get; set; } = "";
+        public short ExternalSwitchCount { get; set; }
         public int? VerifiedClosedLimit { get; set; }
         public int? VerifiedOpenLimit { get; set; }
         public string VerifiedFirmware { get; set; }
@@ -37,6 +39,3 @@ namespace GeminiFlatPanel.Server
         }
     }
 }
-
-
-

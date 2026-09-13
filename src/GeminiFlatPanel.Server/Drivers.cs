@@ -11,22 +11,27 @@ namespace GeminiFlatPanel.Server
     public abstract class DriverBase : ASCOM.LocalServer.ReferenceCountedObjectBase, IDisposable
     {
         private bool connected, disposed;
+        private readonly object connectionGate = new object();
+        protected virtual void AcquireAdditional() { }
+        protected virtual void ReleaseAdditional() { }
         public bool Connected
         {
             get => connected && Hardware.Healthy;
             set
             {
+                lock(connectionGate) {
                 if(disposed) throw new ObjectDisposedException(GetType().Name);
                 if(value == connected) { if(value && !Hardware.Healthy) throw new ASCOM.NotConnectedException("Disconnect and reconnect all Gemini clients."); return; }
-                if(value) { Hardware.Acquire(); connected = true; }
-                else { connected = false; Hardware.Release(); }
+                if(value) { Hardware.Acquire(); try { AcquireAdditional(); connected = true; } catch { Hardware.Release(); throw; } }
+                else { connected = false; try { ReleaseAdditional(); } finally { Hardware.Release(); } }
+                }
             }
         }
         public abstract short InterfaceVersion { get; }
         public abstract string Name { get; }
         public string Description => Name;
-        public string DriverInfo => "CCDASTRO Gemini FlatPanel Pro and dew control prototype 0.11, motion locked pending calibration investigation.";
-        public string DriverVersion => "0.11";
+        public string DriverInfo => "CCDASTRO Gemini FlatPanel Pro and dew control prototype 0.16 with optional external ASCOM Switch, motion locked pending calibration investigation.";
+        public string DriverVersion => "0.16";
         public ArrayList SupportedActions => new ArrayList();
         public string Action(string actionName, string actionParameters) => throw new ASCOM.ActionNotImplementedException(actionName);
         public void CommandBlind(string command, bool raw) => throw new ASCOM.MethodNotImplementedException(nameof(CommandBlind));
@@ -34,8 +39,8 @@ namespace GeminiFlatPanel.Server
         public string CommandString(string command, bool raw) => throw new ASCOM.MethodNotImplementedException(nameof(CommandString));
         protected void Check() { if(!Connected) throw new ASCOM.NotConnectedException("Connect this Gemini driver first."); }
         public void SetupDialog() { using(var form = new SetupForm()) form.ShowDialog(); }
-        public void Dispose() { if(disposed) return; if(connected) { connected = false; Hardware.Release(); } disposed = true; }
-        ~DriverBase() { if(connected) Hardware.Release(); }
+        public void Dispose() { lock(connectionGate) { if(disposed) return; try { if(connected) Connected = false; } finally { disposed = true; /* Base finalizer must release the COM server object count after clients release this object. */ } } }
+        ~DriverBase() { try { Dispose(); } catch { } }
     }
 
     [ComVisible(true), Guid("06F25190-B598-42D5-8207-36754DCD8C2B"), ProgId("ASCOM.CCDASTRO.GeminiFlatPanel.CoverCalibrator"), ClassInterface(ClassInterfaceType.None), ComDefaultInterface(typeof(ICoverCalibratorV1))]
@@ -75,32 +80,36 @@ namespace GeminiFlatPanel.Server
     {
         public override short InterfaceVersion => 2;
         public override string Name => "CCDASTRO Gemini Dew Heater";
-        public short MaxSwitch => 4;
+        protected override void AcquireAdditional() => ExternalSwitch.Acquire();
+        protected override void ReleaseAdditional() => ExternalSwitch.Release();
+        public short MaxSwitch => checked((short)(4 + ExternalSwitch.Count));
         private static readonly string[] commandNames = { "", "High brightness", "Beep", "Stop cover motion" };
-        private void Validate(short id) { Check(); if(id < 0 || id >= MaxSwitch) throw new ASCOM.InvalidValueException(nameof(id), id.ToString(), "0..3"); }
-        public bool CanWrite(short id) { Validate(id); return true; }
-        public string GetSwitchName(short id) { Validate(id); return id == 0 ? Settings.Load().HeaterName : commandNames[id]; }
-        public void SetSwitchName(short id, string name) { Validate(id); if(id != 0) throw new ASCOM.MethodNotImplementedException(nameof(SetSwitchName)); if(string.IsNullOrWhiteSpace(name)) throw new ASCOM.InvalidValueException("name", name ?? "null", "Nonempty name"); var settings = Settings.Load(); settings.HeaterName = name; settings.Save(); }
+        private void Validate(short id) { Check(); if(id < 0 || id >= MaxSwitch) throw new ASCOM.InvalidValueException(nameof(id), id.ToString(), "0.." + (MaxSwitch - 1)); }
+        public bool CanWrite(short id) { Validate(id); return id < 4 || ExternalSwitch.Call(id, (d, i) => d.CanWrite(i)); }
+        public string GetSwitchName(short id) { Validate(id); return id >= 4 ? "SVBONY / " + ExternalSwitch.Call(id, (d, i) => d.GetSwitchName(i)) : "Gemini / " + (id == 0 ? Settings.Load().HeaterName : commandNames[id]); }
+        public void SetSwitchName(short id, string name) { Validate(id); if(id >= 4) { ExternalSwitch.Call(id, (d, i) => d.SetSwitchName(i, name)); return; } if(id != 0) throw new ASCOM.MethodNotImplementedException(nameof(SetSwitchName)); if(string.IsNullOrWhiteSpace(name)) throw new ASCOM.InvalidValueException("name", name ?? "null", "Nonempty name"); var settings = Settings.Load(); settings.HeaterName = name; settings.Save(); }
         public string GetSwitchDescription(short id)
         {
             Validate(id);
+            if(id >= 4) return ExternalSwitch.Call(id, (d, i) => d.GetSwitchDescription(i));
             switch(id)
             {
-                case 0: return "Dew-heater power, 0-100%.";
+                case 0: return "Gemini native dew command (legacy 0-100 range). Hardware may be on/off only; use an appended SVBONY PWM channel for proportional heating.";
                 case 1: return "ON = high, OFF = low. Shows last requested setting; initial OFF is unverified until set.";
                 case 2: return "ON = beep enabled, OFF = disabled. Shows last requested setting; initial OFF is unverified until set.";
                 default: return "ON stops cover movement. OFF resets this indicator; it does not resume movement. Turn off then on to stop again.";
             }
         }
-        public bool GetSwitch(short id) => GetSwitchValue(id) > 0;
-        public void SetSwitch(short id, bool state) => SetSwitchValue(id, state ? MaxSwitchValue(id) : 0);
-        public double MinSwitchValue(short id) { Validate(id); return 0; }
-        public double MaxSwitchValue(short id) { Validate(id); return id == 0 ? 100 : 1; }
-        public double SwitchStep(short id) { Validate(id); return 1; }
-        public double GetSwitchValue(short id) { Validate(id); return id == 0 ? Hardware.ReadStatus(false).HeaterPercent : Hardware.CommandReceipt(id) ? 1 : 0; }
+        public bool GetSwitch(short id) { Validate(id); return id >= 4 ? ExternalSwitch.Call(id, (d, i) => d.GetSwitch(i)) : GetSwitchValue(id) > 0; }
+        public void SetSwitch(short id, bool state) { Validate(id); if(id >= 4) { ExternalSwitch.Call(id, (d, i) => d.SetSwitch(i, state)); return; } SetSwitchValue(id, state ? MaxSwitchValue(id) : 0); }
+        public double MinSwitchValue(short id) { Validate(id); return id >= 4 ? ExternalSwitch.Call(id, (d, i) => d.MinSwitchValue(i)) : 0; }
+        public double MaxSwitchValue(short id) { Validate(id); return id >= 4 ? ExternalSwitch.Call(id, (d, i) => d.MaxSwitchValue(i)) : id == 0 ? 100 : 1; }
+        public double SwitchStep(short id) { Validate(id); return id >= 4 ? ExternalSwitch.Call(id, (d, i) => d.SwitchStep(i)) : 1; }
+        public double GetSwitchValue(short id) { Validate(id); return id >= 4 ? ExternalSwitch.Call(id, (d, i) => d.GetSwitchValue(i)) : id == 0 ? Hardware.ReadStatus(false).HeaterPercent : Hardware.CommandReceipt(id) ? 1 : 0; }
         public void SetSwitchValue(short id, double value)
         {
             Validate(id);
+            if(id >= 4) { ExternalSwitch.Call(id, (d, i) => d.SetSwitchValue(i, value)); return; }
             double maximum = MaxSwitchValue(id);
             if(double.IsNaN(value) || double.IsInfinity(value) || value < 0 || value > maximum)
                 throw new ASCOM.InvalidValueException(nameof(value), value.ToString(), "0.." + maximum);
@@ -112,15 +121,3 @@ namespace GeminiFlatPanel.Server
         }
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-

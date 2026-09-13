@@ -1,8 +1,8 @@
 # CCDASTRO Gemini FlatPanel
 
-ASCOM CoverCalibrator and Switch drivers for the Gemini motorized flat panel. Version **0.11**.
+ASCOM CoverCalibrator and Switch drivers for the Gemini motorized flat panel. Version **0.16**, with optional SVBONY heater control and corrected COM server shutdown.
 
-[Download the installer — GitHub release v0.11](https://github.com/CCDASTRO/ASCOM.CCDASTRO.GeminiFlatPanel/releases/tag/v0.11) · [Offline HTML guide](docs/GeminiFlatPanel-Guide.html)
+[Download Windows installer v0.16](https://github.com/CCDASTRO/ASCOM.CCDASTRO.GeminiFlatPanel/releases/download/v0.16/CCDASTRO.GeminiFlatPanel.Setup-0.16.0.0.exe) · [Offline HTML guide](docs/GeminiFlatPanel-Guide.html)
 
 Control the cover, flat-field light, dew heater, brightness mode, and beep from ASCOM clients such as NINA.
 
@@ -49,7 +49,7 @@ A requested brightness of zero remains a valid light-on setting: ASCOM reports *
 
 | Control | Usage |
 | --- | --- |
-| Dew heater (ID 0) | Set 0–100%. Zero turns output off. Fractional values round to the nearest whole percent, with .5 rounding up. |
+| Dew heater (ID 0) | Legacy Gemini 0–100 command range retained for sequence compatibility. The Gemini 12 V socket has been reported as on/off only; use an appended SVBONY PWM channel for proportional heating. |
 | High brightness (ID 1) | ON requests high brightness mode; OFF requests low mode. |
 | Beep (ID 2) | ON enables beep; OFF disables it. To keep beep enabled, explicitly set ON and leave it there. |
 | Stop cover motion (ID 3) | ON sends halt. OFF clears the indicator only and never resumes movement. Turn OFF then ON to send halt again. |
@@ -106,3 +106,40 @@ The installer is written to `dist`. See [installer details](installer/README.md)
 
 The v0.11 installer was successfully installed by the user and NINA displayed v0.11. Uninstall and upgrade paths have not yet been separately validated. The installer is unsigned.
 
+
+## SVBONY integration and NINA usage
+
+Install SVBONY's ASCOM Switch driver separately. In Gemini setup, with all Switch clients disconnected, choose **Choose SVBONY driver**, select the SVBONY Switch, and configure its COM port through **Properties**. Keep the Gemini COM port configured for the flat panel. Close the vendor applications before connecting.
+
+In NINA, select **CCDASTRO Gemini FlatPanel** for the Flat Device and **CCDASTRO Gemini Dew Heater** for Switch. Connect once to discover the appended SVBONY controls. Use **Disable external** while disconnected to return to Gemini-only operation.
+
+| Device and control | Usage |
+| --- | --- |
+| Gemini Flat Device | Open/close the cover, switch the flat light on/off, and set brightness (0–255). |
+| Gemini / Dew heater (ID 0) | Native 0–100 command retained for future firmware support; the current socket is reported as on/off only. This does not control SVBONY. |
+| Gemini / High brightness (ID 1) | ON selects high mode; OFF selects low mode. Set while the cover is stationary. |
+| Gemini / Beep (ID 2) | ON enables beep; OFF disables it. |
+| Gemini / Stop cover motion (ID 3) | ON sends halt; OFF resets the indicator without moving the cover. |
+| SVBONY / Dew heater 1 / … (%) (ID 18) | PWM1 automatic heater control, normalized to 0–100%. |
+| SVBONY / Dew heater 2 / … (%) (ID 19) | PWM2 manual heater control, normalized to 0–100%. |
+| Other SVBONY controls | Vendor DC/USB controls, adjustable voltage in volts, and read-only environmental gauges. |
+
+The SVBONY channel IDs above apply to the tested 17-channel vendor driver. Gemini adds 4 to each vendor ID. Device prefixes clearly separate the controls; NINA controls the visual layout. Review names and assignments after vendor updates.
+
+### Example sequence
+
+1. Connect both Gemini devices in NINA.
+2. Use a Switch value step for the desired **SVBONY / Dew heater … (%)** channel: for example, **40** requests 40%. Use **0** for off and **100** for maximum. PWM1 retains the vendor's automatic-control behavior; use PWM2 for manual heater control.
+3. Use the Flat Device's open-cover operation for imaging, with the flat light off.
+4. For flats, close the cover, select Gemini high/low mode if needed, then let NINA's flat workflow set the light brightness. Brightness and heater power are separate settings.
+5. After flats, turn the flat light off. Set the SVBONY heater to the desired value or 0, and open or close the cover as your shutdown sequence requires.
+
+Both heater values and readbacks use whole percentages in 1% steps. The bridge converts to the vendor's reported raw maximum (253 in the tested driver). Boolean heater OFF/ON sends 0/100%. Other external channels retain vendor behavior. Existing sequences using raw PWM values must be converted: `round(old value * 100 / vendor maximum)`. For example, 249 becomes 98% with a maximum of 253. Reconnect NINA after upgrading to refresh labels and ranges.
+
+### Connections, upgrades, and validation
+
+Multiple Gemini Switch clients share one vendor connection. The bridge releases it when the last Switch client disconnects, without sending output-setting commands. An independently connected Flat Device remains usable. Native mode and beep indicators show command receipts, not verified readback.
+
+Close all ASCOM clients and setup windows before upgrading. Version 0.16 fixes a Dispose/finalizer bug that left the server running after clients closed. Allow about 10–15 seconds for cleanup. An older lingering server may need to be ended once in Task Manager after all devices are disconnected. Settings and cover calibration are retained.
+
+Validation: 668 simulated assertions passed, including both vendor PWM minima, percentage conversion, shared connection cleanup, and object lifetime. An installed COM client was created, disposed, and released without connecting hardware; the server exited. The user confirmed NINA cover operation, SVBONY controls, and the shutdown fix. Combined-driver ASCOM Conform certification is not claimed.
